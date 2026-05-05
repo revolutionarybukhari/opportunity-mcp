@@ -1,0 +1,27 @@
+name: refresh
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Refresh index
+        run: opportunity-mcp-refresh --db ./index.db
+      - name: Publish DB as release artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: index-${{ github.run_number }}
+          name: "Index snapshot ${{ github.run_number }}"
+          files: ./index.db
+          prerelease: true
+          generate_release_notes: false

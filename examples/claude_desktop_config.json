@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "opportunities": {
+      "command": "opportunity-mcp"
+    }
+  }
+}

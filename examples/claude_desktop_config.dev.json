@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "opportunities": {
+      "command": "/ABSOLUTE/PATH/TO/opportunity-mcp/.venv/bin/python",
+      "args": ["-m", "opportunity_mcp.server"]
+    }
+  }
+}
