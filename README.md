@@ -2,6 +2,9 @@
 
 > Search 10+ youth-opportunity sites — scholarships, fellowships, internships, conferences, exchange programs — from any AI assistant via MCP.
 
+<!-- mcp-name: io.github.revolutionarybukhari/opportunity-mcp -->
+
+
 [![PyPI](https://img.shields.io/pypi/v/opportunity-mcp.svg)](https://pypi.org/project/opportunity-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![tests](https://img.shields.io/github/actions/workflow/status/opportunity-mcp/opportunity-mcp/test.yml?branch=main&label=tests)](https://github.com/opportunity-mcp/opportunity-mcp/actions)
