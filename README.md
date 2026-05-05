@@ -1,43 +1,54 @@
 # Opportunity MCP
 
-> Search 10+ youth-opportunity sites — scholarships, fellowships, internships, conferences, exchange programs — from any AI assistant via MCP.
+> A Model Context Protocol server that lets any AI assistant search youth opportunities — scholarships, fellowships, internships, conferences, and exchange programs — aggregated live from leading opportunity-discovery sites.
 
 <!-- mcp-name: io.github.revolutionarybukhari/opportunity-mcp -->
 
-
-[![PyPI](https://img.shields.io/pypi/v/opportunity-mcp.svg)](https://pypi.org/project/opportunity-mcp/)
+[![PyPI version](https://img.shields.io/pypi/v/opportunity-mcp.svg)](https://pypi.org/project/opportunity-mcp/)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://pypi.org/project/opportunity-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![tests](https://img.shields.io/github/actions/workflow/status/opportunity-mcp/opportunity-mcp/test.yml?branch=main&label=tests)](https://github.com/opportunity-mcp/opportunity-mcp/actions)
+[![Tests](https://img.shields.io/github/actions/workflow/status/revolutionarybukhari/opportunity-mcp/test.yml?branch=main&label=tests)](https://github.com/revolutionarybukhari/opportunity-mcp/actions/workflows/test.yml)
+[![Refresh cron](https://img.shields.io/github/actions/workflow/status/revolutionarybukhari/opportunity-mcp/refresh.yml?branch=main&label=refresh)](https://github.com/revolutionarybukhari/opportunity-mcp/actions/workflows/refresh.yml)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-published-1f6feb)](https://registry.modelcontextprotocol.io)
 
-> **Status:** alpha. The schema and source list will change as adapters mature.
+> **Status:** alpha (`v0.1.x`). Schema, tool surface, and source list may change as adapters mature. Pin to a minor version in production.
 
 ---
 
-## Why
+## Overview
 
-A bright student in Lahore, Lagos, Cairo, or Manila wants to find a fully-funded master's scholarship. Today they:
+Students who depend on third-party scholarship-aggregator sites typically open ten or more tabs, sift through dozens of irrelevant posts, and copy deadlines into a personal spreadsheet — only to miss the application window because no aggregator offers reliable deadline tracking. Opportunity MCP collapses that workflow into a single conversational query.
 
-1. Open 10+ tabs (Scholarships Corner, Youth Opportunities, Opportunity Desk, …).
-2. Manually filter through dozens of irrelevant posts.
-3. Copy-paste deadlines into a spreadsheet.
-4. Miss the deadline anyway because no source tracks them.
-
-Opportunity MCP turns that into:
-
-> **You:** Find me fully-funded master's scholarships in Europe with deadlines in the next 60 days.
+> **You:** Find fully-funded master's scholarships in Europe with deadlines in the next 60 days, eligible for Pakistani citizens.
 >
-> **Claude:** *(returns a clean, deduplicated, structured list pulled live from every source)*
+> **Claude:** *(Returns a deduplicated, structured list pulled live from the indexed sources, sorted by deadline, each linking back to the original article.)*
+
+The server runs locally over stdio, ships an SQLite + FTS5 index that refreshes every six hours via CI, and is distributed through PyPI, the official MCP Registry, and Smithery.
 
 ---
 
-## Install (Claude Desktop)
+## Distribution channels
+
+| Channel | Identifier | Status |
+|---|---|---|
+| PyPI | `opportunity-mcp` | ✅ live |
+| MCP Registry | `io.github.revolutionarybukhari/opportunity-mcp` | ✅ published |
+| Smithery | `sayedhusnainhader/opportunity-mcp` | ✅ published |
+| GitHub | [`revolutionarybukhari/opportunity-mcp`](https://github.com/revolutionarybukhari/opportunity-mcp) | source of truth |
+| GitHub Releases | `index-N` snapshots of the SQLite DB, refreshed every 6h | auto-published by CI |
+
+---
+
+## Installation
+
+### Claude Desktop
 
 ```bash
 pip install opportunity-mcp
-opportunity-mcp-refresh           # build the local index (one-off, ~30s)
+opportunity-mcp-refresh           # build the local index (one-off, ~30 seconds)
 ```
 
-Then add to your `claude_desktop_config.json`:
+Add the following to `claude_desktop_config.json`:
 
 ```json
 {
@@ -49,16 +60,31 @@ Then add to your `claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. Try: *"Use the opportunities tool to find fully-funded fellowships closing in the next 30 days."*
+Restart Claude Desktop. The six tools below become available to the model.
 
-### Cursor / Windsurf / Continue
+### Cursor, Windsurf, Continue, and other MCP clients
 
-Most MCP clients accept the same shape under `mcpServers`. Point them at the `opportunity-mcp` command.
+Most clients use the same `mcpServers` shape. Point the `command` at `opportunity-mcp` (after `pip install`) or use `uvx` for zero-install:
 
-### Run from source
+```json
+{
+  "mcpServers": {
+    "opportunities": {
+      "command": "uvx",
+      "args": ["opportunity-mcp"]
+    }
+  }
+}
+```
+
+### Smithery (one-click install)
+
+`https://smithery.ai/server/sayedhusnainhader/opportunity-mcp` — Smithery handles the install command for you.
+
+### From source
 
 ```bash
-git clone https://github.com/opportunity-mcp/opportunity-mcp
+git clone https://github.com/revolutionarybukhari/opportunity-mcp
 cd opportunity-mcp
 uv sync                           # or: pip install -e ".[dev]"
 uv run opportunity-mcp-refresh
@@ -67,86 +93,110 @@ uv run opportunity-mcp            # speaks MCP over stdio
 
 ---
 
-## Tools exposed
+## Tools
 
-| Tool | What it does |
-|---|---|
-| `search_opportunities(query, type?, funded_only?, deadline_before?, limit?)` | Full-text search with filters. |
-| `get_opportunity(id)` | Look up a single opportunity by id. |
-| `list_latest(type?, limit?)` | Newest opportunities across all sources. |
-| `list_upcoming_deadlines(within_days?, type?)` | Sorted by closing date. |
-| `list_sources()` | What's indexed and when it was last refreshed. |
-| `refresh_index(source?)` | Re-fetch sources on demand. Optional: limit to one source. |
+The server exposes six tools. Each accepts JSON arguments and returns Pydantic-typed results.
+
+| Tool | Signature | Description |
+|---|---|---|
+| `search_opportunities` | `(query, type?, funded_only?, deadline_before?, limit=20)` | Full-text search across all indexed opportunities with optional filters. |
+| `get_opportunity` | `(id)` | Retrieve full details for a single opportunity by its ID. |
+| `list_latest` | `(type?, limit=20)` | Newest opportunities across all sources, sorted by post date. |
+| `list_upcoming_deadlines` | `(within_days=30, type?)` | Opportunities closing within `N` days, sorted by deadline. |
+| `list_sources` | `()` | List indexed sources, item counts, and last-refresh timestamps. |
+| `refresh_index` | `(source?)` | Re-fetch sources on demand. Optional `source` argument limits the refresh to one site. |
+
+`type` is one of `scholarship`, `fellowship`, `internship`, `conference`, `exchange`, `competition`, `grant`, `award`, or `other`.
 
 ---
 
-## Sources
+## Indexed sources
 
-| Source | Type | Status |
+Verified live against each site's RSS feed.
+
+| Source | Mechanism | Status |
 |---|---|---|
-| Opportunities Corners | RSS | ✅ |
-| Opportunities for Youth | RSS | ✅ |
-| Opportunity Desk | RSS | ✅ |
-| Scholarships Corner | RSS | ✅ |
-| Opportunities Circle | RSS | ✅ |
-| Opportunities for Africans | RSS | ✅ |
-| Scholars4Dev | RSS | ✅ |
-| Youth Opportunities (`youthop.com`) | HTML | planned |
-| After School Africa | HTML | planned |
+| [Opportunities Corners](https://opportunitiescorners.com/) | RSS | ✅ live |
+| [Opportunities for Youth](https://opportunitiesforyouth.org/) | RSS | ✅ live |
+| [Opportunity Desk](https://opportunitydesk.org/) | RSS | ✅ live |
+| [Scholarships Corner](https://scholarshipscorner.website/) | RSS | ✅ live |
+| [Opportunities Circle](https://www.opportunitiescircle.com/) | RSS | ✅ live |
+| [Opportunities for Africans](https://www.opportunitiesforafricans.com/) | RSS | ✅ live |
+| [Scholars4Dev](https://www.scholars4dev.com/) | RSS | ✅ adapter live (feed currently empty upstream) |
+| [Youth Opportunities](https://www.youthop.com/) | HTML | planned |
+| [After School Africa](https://www.afterschoolafrica.com/) | HTML | planned |
 
-See [docs/SOURCES.md](docs/SOURCES.md) for `robots.txt` / ToS notes per source.
+Per-source `robots.txt` compliance, ToS notes, and CI quirks are documented in [docs/SOURCES.md](docs/SOURCES.md).
 
 ---
 
 ## Example prompts
 
-> Find me fully-funded master's scholarships in Europe with deadlines in the next 60 days.
->
-> What internships are open right now for students in Africa?
->
-> List the top 10 newest opportunities indexed.
->
-> Anything closing in the next 7 days that I might be eligible for as a Pakistani undergrad?
->
-> Get details on opportunity `a1b2c3d4e5f60718`.
+```
+Find fully-funded master's scholarships in Europe with deadlines in the next 60 days.
 
----
+What conferences are happening in Africa in the next three months?
 
-## Privacy & ethics
+List the ten newest internships indexed today.
 
-- **No user tracking.** Queries never leave your machine.
-- **All indexed data is public.** Articles always link back to the original source.
-- **Polite identification.** The User-Agent contains a contact URL so site owners can reach us.
-- **Conservative refresh cadence.** Every 6h via CI, never on user query.
-- **Source removals.** If a site asks to be delisted, we honor it within 24h. No negotiation.
+Show me everything closing in the next seven days that an undergraduate could apply to.
+
+Get full details for opportunity 7733b95a81e3239d.
+```
 
 ---
 
 ## Architecture
 
 ```
-AI client ──MCP──▶ FastMCP server ──▶ SQLite + FTS5 ◀── refresh job ──▶ source adapters ──▶ scholarship sites
+AI client  ──MCP──▶  FastMCP server  ──▶  SQLite + FTS5  ◀──  refresh job  ──▶  source adapters  ──▶  opportunity sites
 ```
 
-- **Adapters** know how to read one site. They produce raw `Opportunity` objects.
-- **The query engine** knows nothing about sites. It searches the normalized index.
+Two clean separations of concern:
 
-Adding a new source is a 50-line PR. See [docs/ADAPTER_GUIDE.md](docs/ADAPTER_GUIDE.md).
+1. **Adapters** know how to read one site and produce raw `Opportunity` objects (Pydantic-validated).
+2. **The query engine** knows nothing about sites — it searches a normalized index.
+
+Adding a new source is typically a fifty-line pull request. See [docs/ADAPTER_GUIDE.md](docs/ADAPTER_GUIDE.md). Full architecture rationale is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
+## Privacy & ethics
+
+- **No user tracking.** All queries are processed locally; nothing leaves the user's machine except the periodic source-site refresh.
+- **All indexed data is public.** Summaries are capped at 500 characters and every record links back to the originating article.
+- **Polite identification.** The HTTP `User-Agent` includes the project URL so site owners can reach us directly.
+- **Conservative refresh cadence.** Sources are polled at most every six hours, via CI — never on user query.
+- **Source removals on request** are honored within 24 hours, with no negotiation.
+- **`robots.txt` is respected** by every adapter prior to fetching.
+
+---
+
+## Roadmap
+
+- **Phase 2** — country-, level-, and language-aware extraction (currently delegated to the AI client).
+- **Phase 3** — first HTML adapter (Youth Opportunities), broader Tier-2/Tier-4 source coverage.
+- **Phase 4** — hosted Streamable-HTTP endpoint for clients that prefer remote MCP servers.
+- **Phase 5** — optional weekly digest by saved profile.
+
+Open issues with the `add a source` label are good first contributions.
 
 ---
 
 ## Contributing
 
-PRs welcome. The fastest way to help:
+Pull requests are welcome. The fastest way to help is to add a source we do not yet index — read [docs/ADAPTER_GUIDE.md](docs/ADAPTER_GUIDE.md) and open a PR. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup, testing conventions, and the code-of-conduct expectations.
 
-1. Find a source we don't index yet.
-2. Read its `robots.txt` and ToS.
-3. Send a 50-line PR adding an adapter (RSS) or a 100-line PR (HTML).
-
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
+```bash
+git clone https://github.com/revolutionarybukhari/opportunity-mcp
+cd opportunity-mcp
+uv sync
+uv run pytest
+uv run ruff check .
+```
 
 ---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE) © Opportunity MCP Contributors.
